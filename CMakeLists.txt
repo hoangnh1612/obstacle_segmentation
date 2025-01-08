@@ -4,7 +4,7 @@ message("CMake version: ${CMAKE_VERSION}")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(obstacle_segmentation)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} /home/qdt/g2o/g2o/cmake_modules/)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} /home/anlh/g2o/g2o/cmake_modules/)
 
 
 find_package(OpenCV REQUIRED )

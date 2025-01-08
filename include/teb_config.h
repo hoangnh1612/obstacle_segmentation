@@ -247,7 +247,7 @@ public:
     odom_topic = "odom";
     map_frame = "odom";
     
-    robot.robot_length = 0.890;
+    robot.robot_length = 0.590;
     robot.robot_width = 0.580;
     robot.robot_radius = sqrt(pow(robot.robot_length/2, 2) + pow(robot.robot_width/2, 2));
     robot_model = boost::make_shared<PointRobotFootprint>();
@@ -277,17 +277,17 @@ public:
 
     // Robot
 
-    robot.max_vel_x = 1.0;
-    robot.max_vel_x_backwards = 0.5;
+    robot.max_vel_x = 0.5;
+    robot.max_vel_x_backwards = 0.25;
     robot.max_vel_y = 0.0;
     robot.max_vel_trans = 0.0;
-    robot.max_vel_theta = 0.8;
+    robot.max_vel_theta = 0.5;
     robot.acc_lim_x = 1.0;
     robot.acc_lim_y = 1.0;
     robot.acc_lim_theta = 1.0;
     robot.min_turning_radius = 0;
     robot.wheelbase = 1.0;
-    robot.cmd_angle_instead_rotvel = false;
+    robot.cmd_angle_instead_rotvel = true;
     robot.is_footprint_dynamic = false;
     robot.use_proportional_saturation = false;
 
@@ -350,7 +350,7 @@ public:
 
     // Homotopy Class Planner
 
-    hcp.enable_homotopy_class_planning = true;
+    hcp.enable_homotopy_class_planning = false;
     hcp.enable_multithreading = true;
     hcp.simple_exploration = false;
     hcp.max_number_classes = 5;

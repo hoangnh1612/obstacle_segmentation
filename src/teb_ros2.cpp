@@ -7,8 +7,11 @@
 #include <utility>
 #include"obstacles.h"
 #include "nav_msgs/msg/odometry.hpp"
+//cmd_vel publisher
+#include"geometry_msgs/msg/twist.hpp"
 // include yf2 for tf2::getYaw::
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+
 #include "tf2/utils.h"
 #include "homotopy_class_planner.h"
 #include "obstacles.h"
@@ -35,6 +38,14 @@ double findDifferenceOrientation(double angle1, double angle2)
     return diff;
 }
 
+struct Point2d_traj
+{
+    double x;
+    double y;
+    double theta;
+};
+typedef std::vector<Point2d_traj> traj;
+typedef std::vector<traj> traj_set;
 struct RobotPose
 {
     double x;
@@ -45,6 +56,8 @@ struct RobotPose
 class TestClustering
 {
 public:
+    ObstContainer *obstacles;
+    ObstContainer *all_points;
     TestClustering(const LaserScanData& laser_scan_)
         : laser_scan(laser_scan_), angular_resolution(M_PI / 180.0) // Example angular resolution: 1 degree
     {
@@ -226,14 +239,6 @@ public:
                 Eigen::Vector2d p3 = lineIntersection(a3, b3, c3, a4, b4, c4);
                 Eigen::Vector2d p4 = lineIntersection(a1, b1, c1, a4, b4, c4);
 
-                // In ra các điểm giao nhau để kiểm tra
-                std::cout << "Intersection points:" << std::endl;
-                std::cout << "p1: (" << p1.x() << ", " << p1.y() << ")" << std::endl;
-                std::cout << "p2: (" << p2.x() << ", " << p2.y() << ")" << std::endl;
-                std::cout << "p3: (" << p3.x() << ", " << p3.y() << ")" << std::endl;
-                std::cout << "p4: (" << p4.x() << ", " << p4.y() << ")" << std::endl;
-
-                // Kiểm tra các điểm giao nhau hợp lệ
                 if (!std::isnan(p1.x()) && !std::isnan(p1.y()) &&
                     !std::isnan(p2.x()) && !std::isnan(p2.y()) &&
                     !std::isnan(p3.x()) && !std::isnan(p3.y()) &&
@@ -263,7 +268,7 @@ public:
                     if (std::max(edge_1, edge_2) / std::min(edge_1, edge_2) > 5)
                     {
                         std::vector<LineSegment> lineSegments = lineExtraction(point_cloud_clusters[i]);
-                        std::cout << "Extracted " << lineSegments.size() << " line segments from cluster " << i + 1 << std::endl;
+                        //std::cout << "Extracted " << lineSegments.size() << " line segments from cluster " << i + 1 << std::endl;
                         for (size_t k = 0; k < lineSegments.size(); k++)
                         {
                             rectangles.push_back(lineSegments[k]);
@@ -285,7 +290,7 @@ public:
             else
             {
                 std::vector<LineSegment> lineSegments = lineExtraction(point_cloud_clusters[i]);
-                std::cout << "Extracted " << lineSegments.size() << " line segments from cluster " << i + 1 << std::endl;
+                // std::cout << "Extracted " << lineSegments.size() << " line segments from cluster " << i + 1 << std::endl;
                 for (size_t k = 0; k < lineSegments.size(); k++)
                 {
                     rectangles.push_back(lineSegments[k]);
@@ -294,15 +299,7 @@ public:
             }
         }
 
-        for (size_t i = 0; i < rectangles.size(); ++i)
-        {
-            std::cout << "Rectangle " << i + 1 << " has " << rectangles[i].size() << " points:" << std::endl;
-            for (size_t j = 0; j < rectangles[i].size(); ++j)
-            {
-                std::cout << "(" << rectangles[i][j].x() << ", " << rectangles[i][j].y() << ") ";
-            }
-            std::cout << std::endl;
-        }
+
 
     }
     std::vector<LineSegment> lineExtraction(LaserPointCloud cluster)
@@ -442,34 +439,6 @@ public:
         double c2_max = C2.maxCoeff();
         double c2_min = C2.minCoeff();
 
-        // Eigen::VectorXd C1_max = c1_max - C1.array(); 
-        // Eigen::VectorXd C1_min = C1.array() - c1_min;
-        // Eigen::VectorXd D1, D2;
-        // if(C1_max.squaredNorm() < C1_min.squaredNorm()){
-        //     D1 = C1_max;
-        // }
-        // else{
-        //     D1 = C1_min;
-        // }
-        // Eigen::VectorXd C2_max = c2_max - C2.array(); 
-        // Eigen::VectorXd C2_min = C2.array() - c2_min;
-        // if(C2_max.squaredNorm() < C2_min.squaredNorm()){
-        //     D2 = C2_max;
-        // }
-        // else{
-        //     D2 = C2_min;
-        // }
-
-        // double d, min;
-        // double b = 0 ;
-        // for (int i = 0; i < D1.size(); ++i) 
-        // {
-        //     min = std::min(D1(i),D2(i));
-        //     d = std::max(min, d0);
-        //     b = b + 1/d;
-        // }
-        
-        // return b; 
 
 
         Eigen::VectorXd d1 = (c1_max - C1.array()).cwiseMin(C1.array() - c1_min);
@@ -563,9 +532,9 @@ public:
         end.y = center.y + 20 * sin(angle);
         cv::line(map, center, end, cv::Scalar(0,0,255), 2);
     }
-    ObstContainer* getObstacles()
+    ObstContainer *getObstacles()
     {
-        return obstacles;
+        return all_points;
     }
 
     void obsVisualize(cv::Mat &map, bool point_vis, RobotPose robot_pose)
@@ -635,8 +604,6 @@ private:
     double angular_resolution; // Angular resolution in radians
     const double extra_distance = 0.5;
     std::vector<std::vector<Eigen::Vector2d>> rectangles;
-    ObstContainer *obstacles;
-    ObstContainer *all_points;
     double scale = 50.0;  
     double offset_x = 700; 
     double offset_y = 500;
@@ -645,17 +612,48 @@ private:
 class LaserScanSubscriber : public rclcpp::Node
 {
 public:
+    double scale = 50.0;  
+    double offset_x = 700; 
+    double offset_y = 500;
     LaserScanSubscriber()
         : Node("laser_scan_subscriber"), map(1500, 1500, CV_8UC3, cv::Scalar(255,255,255))
     {
+        publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+        cmd_vel_sub = this->create_subscription<geometry_msgs::msg::Twist>(
+            "cmd_vel", 10, std::bind(&LaserScanSubscriber::velCallback, this, std::placeholders::_1));
+
         subscription_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "scan", 10, std::bind(&LaserScanSubscriber::scanCallback, this, std::placeholders::_1));
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "odom", 10, std::bind(&LaserScanSubscriber::odomCallback, this, std::placeholders::_1));      
     }
+
+// hcp calculate multiples traj, choose 1 best_path
+    int takeBestPath(traj_set TrajectSet)
+    {
+        int best_path = 0;
+        double best_cost = 1000000;
+        for (int i = 0; i < TrajectSet.size(); i++)
+        {
+            double cost = 0;
+            for (int j = 0; j < TrajectSet[i].size(); j++)
+            {
+                cost += TrajectSet[i][j].x;
+            }
+            if (cost < best_cost)
+            {
+                best_cost = cost;
+                best_path = i;
+            }
+        }
+        return best_path;
+    }
+
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        RCLCPP_INFO(this->get_logger(), "Received LaserScan data: range size: %zu", msg->ranges.size());
+        int idx = 0;
+        std::vector<cv::Point> path_points;
+        // RCLCPP_INFO(this->get_logger(), "Received LaserScan data: range size: %zu", msg->ranges.size());
         LaserScanData scan;
         map = cv::Scalar(255, 255, 255); 
         for (size_t i = 0; i < msg->ranges.size(); ++i)
@@ -670,13 +668,84 @@ public:
         }
         TestClustering clustering(scan);
         clustering.clusterPointCloud();
-        clustering.printClusters();
+        // clustering.printClusters();
         clustering.rectangleFitting();
-        clustering.obsVisualize(map, false, robot_pose);
+
+        TebConfig cfg;
+        ObstContainer *obstacles = clustering.getObstacles();
+        HomotopyClassPlanner hcp(cfg, obstacles, nullptr);
+        PoseSE2 start(robot_pose.x, robot_pose.y, robot_pose.theta), goal(10, -5, 0);
+        // std::cout<<"Start: "<<robot_pose.x<<" "<<robot_pose.y<<" "<<robot_pose.theta<<std::endl;
+        Twist start_vel{prev_linear, prev_angular};
+        hcp.plan(start, goal, &start_vel, false);
+        clustering.obsVisualize(map, true, robot_pose);
+
+        const auto& all_tebs = hcp.getTrajectoryContainer();
+        if (!all_tebs.empty())
+        {
+            Twist velocity;
+            // hcp.getVelocityCommand(velocity, all_tebs.size());
+
+            traj_set TrajectSet;
+            for (auto& planner : all_tebs)
+            {
+                auto &teb = planner->teb();
+                traj Traject;
+                for (int p = 0; p<teb.sizePoses();++p)
+                {
+                    auto &pose = teb.Pose(p);
+                    Point2d_traj pointt;
+                    pointt.x = pose.x();
+                    pointt.y = pose.y();
+                    pointt.theta = pose.theta();
+                    Traject.push_back(pointt);
+                }
+                TrajectSet.push_back(Traject);   
+            }
+            int k = takeBestPath(TrajectSet);
+            std::cout<<"Best path: "<<k<<std::endl;
+            auto &teb = all_tebs[k]->teb();
+
+            path_points.reserve(teb.sizePoses());
+            for(int p = 0; p < teb.sizePoses(); ++p)
+            {
+                auto &pose = teb.Pose(p);
+                double x = pose.x();
+                double y = pose.y();
+                path_points.push_back(scalePoint(x, y, scale, offset_x, offset_y));
+                // std::cout<<"Pose:"<<x<<" "<<y<<std::endl;
+            }
+            hcp.getVelocityCommand(velocity, 0);
+            std::cout<<"Velocity: "<<velocity.linear<<" "<<velocity.angular<<std::endl;
+            // publish velocity to cmd_vel
+            geometry_msgs::msg::Twist cmd_vel;
+            cmd_vel.linear.x = velocity.linear;
+            cmd_vel.angular.z = velocity.angular;
+            publisher_->publish(cmd_vel);
+        }
+        else
+        {
+            geometry_msgs::msg::Twist cmd_vel;
+            cmd_vel.linear.x = 0.0;
+            cmd_vel.angular.z = 0.15;
+            publisher_->publish(cmd_vel);
+        }
+        cv::Scalar color( (50*idx) % 255, (100*idx)%255, (150*idx)%255 );
+        idx++;
+
+        if(path_points.size()>1)
+        {
+            cv::polylines(map, path_points, false, color, 2);
+        }
+        if(!path_points.empty())
+        {
+            cv::circle(map, path_points.front(), 6, color, -1);
+            cv::putText(map, "Start", path_points.front(), cv::FONT_HERSHEY_SIMPLEX, 0.4, color);
+            cv::circle(map, path_points.back(), 6, color, -1);
+            cv::putText(map, "Goal", path_points.back(), cv::FONT_HERSHEY_SIMPLEX, 0.4, color);
+        }
         cv::imshow("Map", map);
         cv::waitKey(1);
-
-
     }
     Eigen::Vector2d transformToGlobal(double r, double theta)
     {
@@ -693,8 +762,17 @@ public:
         robot_pose.theta = tf2::getYaw(msg->pose.pose.orientation);
 
     }
+    void velCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
+    {
+        prev_linear = msg->linear.x;
+        prev_angular = msg->angular.z;
+    }
+    double prev_linear = 0.0;
+    double prev_angular = 0.0;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr subscription_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub;
     RobotPose robot_pose;
     cv::Mat map;
 };
